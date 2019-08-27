@@ -1,45 +1,45 @@
 import flatten from 'lodash/flatten'
 
-import { Slots, Track, Slot } from '../src/sla-calculator'
-import { slot, hours } from './helpers'
+import { Spans, SpanList, Span, ValueSpan } from '../src/sla-calculator'
+import { span, hours } from './helpers'
 
 describe('Availability Models', () => {
-  type CI = Track
+  type CI = SpanList
   type SOF = Array<CI>
 
-  const ci1 = [slot('00:00', '06:00'), slot('11:00', '18:00')]
-  const ci2 = [slot('01:00', '07:00'), slot('12:00', '19:00')]
-  const ci3 = [slot('02:00', '08:00'), slot('13:00', '20:00')]
-  const ci4 = [slot('03:00', '09:00'), slot('14:00', '21:00')]
-  const ci5 = [slot('04:00', '10:00'), slot('15:00', '22:00')]
+  const ci1 = [span('00:00', '06:00'), span('11:00', '18:00')]
+  const ci2 = [span('01:00', '07:00'), span('12:00', '19:00')]
+  const ci3 = [span('02:00', '08:00'), span('13:00', '20:00')]
+  const ci4 = [span('03:00', '09:00'), span('14:00', '21:00')]
+  const ci5 = [span('04:00', '10:00'), span('15:00', '22:00')]
 
   const sof: SOF = [ci1, ci2, ci3, ci4, ci5]
 
-  // Merge overlapping slots per CI then merge slots from all CIs
-  // after which: number of overlapping slots => number of CIs down
-  const slots = flatten(sof.map(ci => Slots.flatten(ci)))
+  // Merge overlapping spans per CI then merge spans from all CIs
+  // after which: number of overlapping spans => number of CIs down
+  const spans = flatten(sof.map(ci => Spans.flatten(ci)))
 
   describe('All Model', () => {
     it('counts as down if all CIs are down', () => {
       // Calculate percentage of affected CIs
-      const ratios = Slots.aggregate(slots, Slots.Aggregators.ratio(sof.length))
+      const ratios = Spans.aggregate(spans, Spans.Aggregators.ratio(sof.length))
 
-      // Get all slots where outage is 100%
-      const downs = ratios.filter(slot => slot.value === 1)
+      // Get all spans where outage is 100%
+      const downs = ratios.filter(span => span.value === 1)
       expect(downs).toEqual([
-        slot('04:00', '06:00', 1.0), // 100% down
-        slot('15:00', '18:00', 1.0) //  100% down
+        span('04:00', '06:00', 1.0), // 100% down
+        span('15:00', '18:00', 1.0) //  100% down
       ])
 
-      // Use duration of slot as slot value (in seconds)
-      const durations = Slots.map(downs, Slots.Mappers.duration)
+      // Use duration of span as span value (in seconds)
+      const durations = Spans.map(downs, Spans.Mappers.duration)
       expect(durations).toEqual([
-        slot('04:00', '06:00', 2 * hours), // 2h
-        slot('15:00', '18:00', 3 * hours) //  3h
+        span('04:00', '06:00', 2 * hours), // 2h
+        span('15:00', '18:00', 3 * hours) //  3h
       ])
 
       // Get total of downtime in seconds
-      const downtime = Slots.Aggregators.sum(durations)
+      const downtime = Spans.Aggregators.sum(durations)
       expect(downtime).toEqual(5 * hours) // 5h
 
       // Calculate availability
@@ -50,25 +50,25 @@ describe('Availability Models', () => {
 
   describe('More-than-one Model', () => {
     it('counts as down if more than one CIs is down', () => {
-      // Count overlapping slots => number of CIs down
-      const counts = Slots.aggregate(slots, Slots.Aggregators.count)
+      // Count overlapping spans => number of CIs down
+      const counts = Spans.aggregate(spans, Spans.Aggregators.count)
 
-      // Get all slots where count > 1
-      const downs = Slots.flatten(counts.filter(slot => slot.value! > 1))
+      // Get all spans where count > 1
+      const downs = Spans.flatten(counts.filter(span => span.value! > 1))
       expect(downs).toEqual([
-        slot('01:00', '09:00'), //
-        slot('12:00', '21:00') //
+        span('01:00', '09:00'), //
+        span('12:00', '21:00') //
       ])
 
-      // Use duration of slot as slot value (in seconds)
-      const durations = Slots.map(downs, Slots.Mappers.duration)
+      // Use duration of span as span value (in seconds)
+      const durations = Spans.map(downs, Spans.Mappers.duration)
       expect(durations).toEqual([
-        slot('01:00', '09:00', 8 * 3600), // 8h
-        slot('12:00', '21:00', 9 * 3600) // 9h
+        span('01:00', '09:00', 8 * 3600), // 8h
+        span('12:00', '21:00', 9 * 3600) // 9h
       ])
 
       // Get total of downtime in seconds
-      const downtime = Slots.Aggregators.sum(durations)
+      const downtime = Spans.Aggregators.sum(durations)
       expect(downtime).toEqual(17 * 3600) // 17h
 
       // Calculate availability
@@ -80,39 +80,39 @@ describe('Availability Models', () => {
   describe('Downtime-ratio Model', () => {
     it('calculates availabilty based on duration and ratio of down CIs', () => {
       // Calculate percentage of affected CIs
-      const ratios = Slots.aggregate(slots, Slots.Aggregators.ratio(sof.length))
+      const ratios = Spans.aggregate(spans, Spans.Aggregators.ratio(sof.length))
 
       // Create mapper which multiplies duration based on ratio of down CIs
-      const mapper: Slots.Mappers.MapperFn<number, number> = (slot: Slot<number>) => {
-        const duration = (slot.end.valueOf() - slot.start.valueOf()) / 1000
-        return { ...slot, value: (slot.value || 0) * duration }
+      const mapper: Spans.Mappers.MapperFn<ValueSpan<number>, ValueSpan<number>> = span => {
+        const duration = (span.end.valueOf() - span.start.valueOf()) / 1000
+        return { ...span, value: span.value * duration }
       }
 
-      // Use partial duration of slot as slot value (in seconds)
-      const durations = Slots.map(ratios, mapper)
+      // Use partial duration of span as span value (in seconds)
+      const durations = Spans.map(ratios, mapper)
       expect(durations).toEqual([
-        slot('00:00', '01:00', 3600 * 0.2),
-        slot('01:00', '02:00', 3600 * 0.4),
-        slot('02:00', '03:00', 3600 * 0.6),
-        slot('03:00', '04:00', 3600 * 0.8),
-        slot('04:00', '06:00', 3600 * 1.0 * 2), // 2h
-        slot('06:00', '07:00', 3600 * 0.8),
-        slot('07:00', '08:00', 3600 * 0.6),
-        slot('08:00', '09:00', 3600 * 0.4),
-        slot('09:00', '10:00', 3600 * 0.2),
-        slot('11:00', '12:00', 3600 * 0.2),
-        slot('12:00', '13:00', 3600 * 0.4),
-        slot('13:00', '14:00', 3600 * 0.6),
-        slot('14:00', '15:00', 3600 * 0.8),
-        slot('15:00', '18:00', 3600 * 1.0 * 3), // 3h
-        slot('18:00', '19:00', 3600 * 0.8),
-        slot('19:00', '20:00', 3600 * 0.6),
-        slot('20:00', '21:00', 3600 * 0.4),
-        slot('21:00', '22:00', 3600 * 0.2)
+        span('00:00', '01:00', 3600 * 0.2),
+        span('01:00', '02:00', 3600 * 0.4),
+        span('02:00', '03:00', 3600 * 0.6),
+        span('03:00', '04:00', 3600 * 0.8),
+        span('04:00', '06:00', 3600 * 1.0 * 2), // 2h
+        span('06:00', '07:00', 3600 * 0.8),
+        span('07:00', '08:00', 3600 * 0.6),
+        span('08:00', '09:00', 3600 * 0.4),
+        span('09:00', '10:00', 3600 * 0.2),
+        span('11:00', '12:00', 3600 * 0.2),
+        span('12:00', '13:00', 3600 * 0.4),
+        span('13:00', '14:00', 3600 * 0.6),
+        span('14:00', '15:00', 3600 * 0.8),
+        span('15:00', '18:00', 3600 * 1.0 * 3), // 3h
+        span('18:00', '19:00', 3600 * 0.8),
+        span('19:00', '20:00', 3600 * 0.6),
+        span('20:00', '21:00', 3600 * 0.4),
+        span('21:00', '22:00', 3600 * 0.2)
       ])
 
       // Get total of downtime in seconds
-      const downtime = Slots.Aggregators.sum(durations)
+      const downtime = Spans.Aggregators.sum(durations)
       expect(downtime).toEqual(13 * 3600) // 13h
 
       // Calculate availability
@@ -124,29 +124,29 @@ describe('Availability Models', () => {
   describe('Percentage Model (> 50%)', () => {
     it('counts as down if more than 50% CIs are down', () => {
       // Calculate percentage of affected CIs
-      const ratios = Slots.aggregate(slots, Slots.Aggregators.ratio(sof.length))
+      const ratios = Spans.aggregate(spans, Spans.Aggregators.ratio(sof.length))
 
-      // Get all slots where outage is 100%
-      const downs = ratios.filter(slot => (slot.value || 0) > 0.5)
+      // Get all spans where outage is 100%
+      const downs = ratios.filter(span => (span.value || 0) > 0.5)
       expect(downs).toEqual([
-        slot('02:00', '03:00', 0.6), // 60% down
-        slot('03:00', '04:00', 0.8), // 80% down
-        slot('04:00', '06:00', 1.0), // 100% down for 2h
-        slot('06:00', '07:00', 0.8), // 80% down
-        slot('07:00', '08:00', 0.6), //  60% down
+        span('02:00', '03:00', 0.6), // 60% down
+        span('03:00', '04:00', 0.8), // 80% down
+        span('04:00', '06:00', 1.0), // 100% down for 2h
+        span('06:00', '07:00', 0.8), // 80% down
+        span('07:00', '08:00', 0.6), //  60% down
 
-        slot('13:00', '14:00', 0.6), // 60% down
-        slot('14:00', '15:00', 0.8), // 80% down
-        slot('15:00', '18:00', 1.0), // 100% down for 3h
-        slot('18:00', '19:00', 0.8), // 80% down
-        slot('19:00', '20:00', 0.6) //  60% down
+        span('13:00', '14:00', 0.6), // 60% down
+        span('14:00', '15:00', 0.8), // 80% down
+        span('15:00', '18:00', 1.0), // 100% down for 3h
+        span('18:00', '19:00', 0.8), // 80% down
+        span('19:00', '20:00', 0.6) //  60% down
       ])
 
-      // Use duration of slot as slot value (in seconds)
-      const durations = Slots.map(downs, Slots.Mappers.duration)
+      // Use duration of span as span value (in seconds)
+      const durations = Spans.map(downs, Spans.Mappers.duration)
 
       // Get total of downtime in seconds
-      const downtime = Slots.Aggregators.sum(durations)
+      const downtime = Spans.Aggregators.sum(durations)
       expect(downtime).toEqual(13 * 3600) // 13h
 
       // Calculate availability
@@ -158,24 +158,24 @@ describe('Availability Models', () => {
   describe('Percentage Model (> 75%)', () => {
     it('counts as down if more than 75% CIs are down', () => {
       // Calculate percentage of affected CIs
-      const ratios = Slots.aggregate(slots, Slots.Aggregators.ratio(sof.length))
+      const ratios = Spans.aggregate(spans, Spans.Aggregators.ratio(sof.length))
 
-      // Get all slots where outage is 100%
-      const downs = ratios.filter(slot => (slot.value || 0) > 0.75)
+      // Get all spans where outage is 100%
+      const downs = ratios.filter(span => (span.value || 0) > 0.75)
       expect(downs).toEqual([
-        slot('03:00', '04:00', 0.8), // 80% down
-        slot('04:00', '06:00', 1.0), // 100% down for 2h
-        slot('06:00', '07:00', 0.8), // 80% down
-        slot('14:00', '15:00', 0.8), // 80% down
-        slot('15:00', '18:00', 1.0), // 100% down for 3h
-        slot('18:00', '19:00', 0.8) // 80% down
+        span('03:00', '04:00', 0.8), // 80% down
+        span('04:00', '06:00', 1.0), // 100% down for 2h
+        span('06:00', '07:00', 0.8), // 80% down
+        span('14:00', '15:00', 0.8), // 80% down
+        span('15:00', '18:00', 1.0), // 100% down for 3h
+        span('18:00', '19:00', 0.8) // 80% down
       ])
 
-      // Use duration of slot as slot value (in seconds)
-      const durations = Slots.map(downs, Slots.Mappers.duration)
+      // Use duration of span as span value (in seconds)
+      const durations = Spans.map(downs, Spans.Mappers.duration)
 
       // Get total of downtime in seconds
-      const downtime = Slots.Aggregators.sum(durations)
+      const downtime = Spans.Aggregators.sum(durations)
       expect(downtime).toEqual(9 * 3600) // 9h
 
       // Calculate availability

@@ -1,11 +1,19 @@
 import moment from 'moment'
-import { Slot } from '../src/sla-calculator'
+import { Span, ValueSpan } from '../src/sla-calculator'
 
-export function slot(start: string, end: string, value?: any): Slot {
-  return {
-    start: time(start),
-    end: time(end),
-    value
+export function span<T>(start: string, end: string, value?: T) {
+  if (value) {
+    return {
+      start: time(start),
+      end: time(end),
+      value
+    } as ValueSpan<T>
+  } else {
+    return {
+      start: time(start),
+      end: time(end),
+      value
+    } as Span
   }
 }
 
