@@ -1,10 +1,9 @@
+import { Schedule, ValueSpan, Operations, Aggregators, Mappers, MapperFn } from '../src'
 import flatten from 'lodash/flatten'
-
-import { Spans, SpanList, Span, ValueSpan } from '../src/sla-calculator'
 import { span, hours } from './helpers'
 
 describe('Availability Models', () => {
-  type CI = SpanList
+  type CI = Schedule
   type SOF = Array<CI>
 
   const ci1 = [span('00:00', '06:00'), span('11:00', '18:00')]
@@ -17,121 +16,131 @@ describe('Availability Models', () => {
 
   // Merge overlapping spans per CI then merge spans from all CIs
   // after which: number of overlapping spans => number of CIs down
-  const spans = flatten(sof.map(ci => Spans.flatten(ci)))
+  let spans = flatten(sof.map(ci => Operations.flatten(ci)))
+
+  // Mask maintanance windows
+  spans = Operations.subtract(spans, [
+    span('00:00', '01:00'), // 1
+    span('01:00', '02:00'), // 1
+    span('04:00', '06:00'), // 2
+    span('08:00', '10:00') //  3
+  ])
 
   describe('All Model', () => {
     it('counts as down if all CIs are down', () => {
       // Calculate percentage of affected CIs
-      const ratios = Spans.aggregate(spans, Spans.Aggregators.ratio(sof.length))
+      const ratios = Operations.aggregate(spans, Aggregators.ratio(sof.length))
 
       // Get all spans where outage is 100%
       const downs = ratios.filter(span => span.value === 1)
       expect(downs).toEqual([
-        span('04:00', '06:00', 1.0), // 100% down
+        // span('04:00', '06:00', 1.0), // 100% down
         span('15:00', '18:00', 1.0) //  100% down
       ])
 
       // Use duration of span as span value (in seconds)
-      const durations = Spans.map(downs, Spans.Mappers.duration)
+      const durations = Operations.map(downs, Mappers.duration)
       expect(durations).toEqual([
-        span('04:00', '06:00', 2 * hours), // 2h
+        // span('04:00', '06:00', 2 * hours), // 2h
         span('15:00', '18:00', 3 * hours) //  3h
       ])
 
       // Get total of downtime in seconds
-      const downtime = Spans.Aggregators.sum(durations)
-      expect(downtime).toEqual(5 * hours) // 5h
+      const downtime = Aggregators.sum(durations)
+      expect(downtime).toEqual(3 * hours) // 3h
 
       // Calculate availability
       const avail = 100 - (downtime / (24 * hours)) * 100
-      expect(avail).toBeCloseTo(79.166)
+      expect(avail).toBeCloseTo(87.5)
     })
   })
 
   describe('More-than-one Model', () => {
     it('counts as down if more than one CIs is down', () => {
       // Count overlapping spans => number of CIs down
-      const counts = Spans.aggregate(spans, Spans.Aggregators.count)
+      const counts = Operations.aggregate(spans, Aggregators.count)
 
       // Get all spans where count > 1
-      const downs = Spans.flatten(counts.filter(span => span.value! > 1))
+      const downs = Operations.flatten(counts.filter(span => span.value > 1))
       expect(downs).toEqual([
-        span('01:00', '09:00'), //
+        span('02:00', '04:00'), //
+        span('06:00', '08:00'), //
         span('12:00', '21:00') //
       ])
 
       // Use duration of span as span value (in seconds)
-      const durations = Spans.map(downs, Spans.Mappers.duration)
+      const durations = Operations.map(downs, Mappers.duration)
       expect(durations).toEqual([
-        span('01:00', '09:00', 8 * 3600), // 8h
-        span('12:00', '21:00', 9 * 3600) // 9h
+        span('02:00', '04:00', 2 * hours), //
+        span('06:00', '08:00', 2 * hours), //
+        span('12:00', '21:00', 9 * hours) //
       ])
 
       // Get total of downtime in seconds
-      const downtime = Spans.Aggregators.sum(durations)
-      expect(downtime).toEqual(17 * 3600) // 17h
+      const downtime = Aggregators.sum(durations)
+      expect(downtime).toEqual(13 * hours)
 
       // Calculate availability
-      const avail = 100 - (downtime / (24 * 3600)) * 100
-      expect(avail).toBeCloseTo(29.166)
+      const avail = 100 - (downtime / (24 * hours)) * 100
+      expect(avail).toBeCloseTo(45.83)
     })
   })
 
   describe('Downtime-ratio Model', () => {
     it('calculates availabilty based on duration and ratio of down CIs', () => {
       // Calculate percentage of affected CIs
-      const ratios = Spans.aggregate(spans, Spans.Aggregators.ratio(sof.length))
+      const ratios = Operations.aggregate(spans, Aggregators.ratio(sof.length))
 
       // Create mapper which multiplies duration based on ratio of down CIs
-      const mapper: Spans.Mappers.MapperFn<ValueSpan<number>, ValueSpan<number>> = span => {
+      const mapper: MapperFn<ValueSpan<number>, ValueSpan<number>> = span => {
         const duration = (span.end.valueOf() - span.start.valueOf()) / 1000
-        return { ...span, value: span.value * duration }
+        return [{ ...span, value: span.value * duration }]
       }
 
       // Use partial duration of span as span value (in seconds)
-      const durations = Spans.map(ratios, mapper)
+      const durations = Operations.map(ratios, mapper)
       expect(durations).toEqual([
-        span('00:00', '01:00', 3600 * 0.2),
-        span('01:00', '02:00', 3600 * 0.4),
-        span('02:00', '03:00', 3600 * 0.6),
-        span('03:00', '04:00', 3600 * 0.8),
-        span('04:00', '06:00', 3600 * 1.0 * 2), // 2h
-        span('06:00', '07:00', 3600 * 0.8),
-        span('07:00', '08:00', 3600 * 0.6),
-        span('08:00', '09:00', 3600 * 0.4),
-        span('09:00', '10:00', 3600 * 0.2),
-        span('11:00', '12:00', 3600 * 0.2),
-        span('12:00', '13:00', 3600 * 0.4),
-        span('13:00', '14:00', 3600 * 0.6),
-        span('14:00', '15:00', 3600 * 0.8),
-        span('15:00', '18:00', 3600 * 1.0 * 3), // 3h
-        span('18:00', '19:00', 3600 * 0.8),
-        span('19:00', '20:00', 3600 * 0.6),
-        span('20:00', '21:00', 3600 * 0.4),
-        span('21:00', '22:00', 3600 * 0.2)
+        // span('00:00', '01:00', hours * 0.2),
+        // span('01:00', '02:00', hours * 0.4),
+        span('02:00', '03:00', hours * 0.6),
+        span('03:00', '04:00', hours * 0.8),
+        // span('04:00', '06:00', hours * 1.0 * 2), // 2h
+        span('06:00', '07:00', hours * 0.8),
+        span('07:00', '08:00', hours * 0.6),
+        // span('08:00', '09:00', hours * 0.4),
+        // span('09:00', '10:00', hours * 0.2),
+        span('11:00', '12:00', hours * 0.2),
+        span('12:00', '13:00', hours * 0.4),
+        span('13:00', '14:00', hours * 0.6),
+        span('14:00', '15:00', hours * 0.8),
+        span('15:00', '18:00', hours * 1.0 * 3), // 3h
+        span('18:00', '19:00', hours * 0.8),
+        span('19:00', '20:00', hours * 0.6),
+        span('20:00', '21:00', hours * 0.4),
+        span('21:00', '22:00', hours * 0.2)
       ])
 
       // Get total of downtime in seconds
-      const downtime = Spans.Aggregators.sum(durations)
-      expect(downtime).toEqual(13 * 3600) // 13h
+      const downtime = Aggregators.sum(durations)
+      expect(downtime).toEqual(9.8 * hours)
 
       // Calculate availability
-      const avail = 100 - (downtime / (24 * 3600)) * 100
-      expect(avail).toBeCloseTo(45.83)
+      const avail = 100 - (downtime / (24 * hours)) * 100
+      expect(avail).toBeCloseTo(59.17)
     })
   })
 
   describe('Percentage Model (> 50%)', () => {
-    it('counts as down if more than 50% CIs are down', () => {
+    fit('counts as down if more than 50% CIs are down', () => {
       // Calculate percentage of affected CIs
-      const ratios = Spans.aggregate(spans, Spans.Aggregators.ratio(sof.length))
+      const ratios = Operations.aggregate(spans, Aggregators.ratio(sof.length))
 
       // Get all spans where outage is 100%
-      const downs = ratios.filter(span => (span.value || 0) > 0.5)
+      const downs = ratios.filter(span => span.value > 0.5)
       expect(downs).toEqual([
         span('02:00', '03:00', 0.6), // 60% down
         span('03:00', '04:00', 0.8), // 80% down
-        span('04:00', '06:00', 1.0), // 100% down for 2h
+        // span('04:00', '06:00', 1.0), // 100% down for 2h
         span('06:00', '07:00', 0.8), // 80% down
         span('07:00', '08:00', 0.6), //  60% down
 
@@ -143,25 +152,25 @@ describe('Availability Models', () => {
       ])
 
       // Use duration of span as span value (in seconds)
-      const durations = Spans.map(downs, Spans.Mappers.duration)
+      const durations = Operations.map(downs, Mappers.duration)
 
       // Get total of downtime in seconds
-      const downtime = Spans.Aggregators.sum(durations)
-      expect(downtime).toEqual(13 * 3600) // 13h
+      const downtime = Aggregators.sum(durations)
+      expect(downtime).toEqual(11 * hours) // 13h
 
       // Calculate availability
-      const avail = 100 - (downtime / (24 * 3600)) * 100
-      expect(avail).toBeCloseTo(45.83)
+      const avail = 100 - (downtime / (24 * hours)) * 100
+      expect(avail).toBeCloseTo(54.17)
     })
   })
 
   describe('Percentage Model (> 75%)', () => {
     it('counts as down if more than 75% CIs are down', () => {
       // Calculate percentage of affected CIs
-      const ratios = Spans.aggregate(spans, Spans.Aggregators.ratio(sof.length))
+      const ratios = Operations.aggregate(spans, Aggregators.ratio(sof.length))
 
       // Get all spans where outage is 100%
-      const downs = ratios.filter(span => (span.value || 0) > 0.75)
+      const downs = ratios.filter(span => span.value > 0.75)
       expect(downs).toEqual([
         span('03:00', '04:00', 0.8), // 80% down
         span('04:00', '06:00', 1.0), // 100% down for 2h
@@ -172,14 +181,14 @@ describe('Availability Models', () => {
       ])
 
       // Use duration of span as span value (in seconds)
-      const durations = Spans.map(downs, Spans.Mappers.duration)
+      const durations = Operations.map(downs, Mappers.duration)
 
       // Get total of downtime in seconds
-      const downtime = Spans.Aggregators.sum(durations)
-      expect(downtime).toEqual(9 * 3600) // 9h
+      const downtime = Aggregators.sum(durations)
+      expect(downtime).toEqual(9 * hours) // 9h
 
       // Calculate availability
-      const avail = 100 - (downtime / (24 * 3600)) * 100
+      const avail = 100 - (downtime / (24 * hours)) * 100
       expect(avail).toBeCloseTo(62.5)
     })
   })
