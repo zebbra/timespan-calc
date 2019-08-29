@@ -1,7 +1,4 @@
-import pull from 'lodash/pull'
-import { Moment } from 'moment'
-import { Schedule, Span, ValueSpan } from '.'
-import { Events } from './events'
+import { Schedule, Span, ValueSpan } from './span'
 
 export type AggregatorFn<T extends Span, V> = (schedule: Schedule<T>) => V
 

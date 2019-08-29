@@ -24,7 +24,7 @@
     "build": "tsc --module commonjs && rollup -c rollup.config.ts && yarn run docs",
     "docs": "typedoc --out docs --target es6 --theme minimal --mode file src",
     "start": "rollup -c rollup.config.ts -w",
-    "test": "jest --coverage",
+    "test": "jest --coverage --runInBand",
     "test:watch": "jest --coverage --watch",
     "test:prod": "yarn run lint && yarn run test --no-cache",
     "deploy-docs": "ts-node tools/gh-pages-publish",

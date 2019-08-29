@@ -1,6 +1,5 @@
-import { Operations, Mappers, Span } from '../src'
-import { span, hours, normalizeSpans } from './helpers'
-import * as moment from 'moment'
+import { Mappers, Span } from '../src'
+import { span, normalizeSpans } from './helpers'
 
 describe('Mappers', () => {
   describe('#subtractor', () => {
@@ -52,6 +51,21 @@ describe('Mappers', () => {
         span('12:00', '13:00', 'A'), //
         span('14:00', '17:00', 'A') //
       ])
+    })
+  })
+
+  describe('#intersector', () => {
+    const intersect = (a: Span, b: Span | Span[]) => normalizeSpans(Mappers.intersector(b)(a))
+
+    const a = span('06:00', '18:00', 'A')
+
+    describe('from a span A using a single span B', () => {
+      test('when span A start is overlapped by B', () => {
+        const b = span('04:00', '10:00')
+        expect(intersect(a, b)).toEqual([
+          span('06:00', '10:00', 'A') //
+        ])
+      })
     })
   })
 })

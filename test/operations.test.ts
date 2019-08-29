@@ -125,7 +125,6 @@ describe('Operations', () => {
     })
   })
 
-  // tslint:disable-next-line: no-empty
   test('#subtract', () => {
     const a = [
       span('01:00', '08:00', 'A'),
@@ -147,6 +146,32 @@ describe('Operations', () => {
       span('09:00', '12:00', 'B'),
       span('17:00', '19:00', 'C'),
       span('20:00', '21:00', 'C')
+    ])
+  })
+
+  test('#intersect', () => {
+    const a = [
+      span('01:00', '16:00', 'A'),
+      span('08:00', '16:00', 'B'),
+      span('08:00', '20:00', 'C')
+    ]
+
+    const b = [
+      span('00:00', '05:00'),
+      span('08:00', '09:00'),
+      span('15:00', '21:00'),
+      span('20:00', '21:00')
+    ]
+
+    const res = Operations.intersect(a, b)
+    expect(res).toEqual([
+      span('01:00', '05:00', 'A'),
+      span('08:00', '09:00', 'A'),
+      span('15:00', '16:00', 'A'),
+      span('08:00', '09:00', 'B'),
+      span('15:00', '16:00', 'B'),
+      span('08:00', '09:00', 'C'),
+      span('15:00', '20:00', 'C')
     ])
   })
 })

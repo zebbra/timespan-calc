@@ -1,4 +1,4 @@
-import { Span, Schedule } from '.'
+import { Span, Schedule } from './span'
 import flatMap from 'lodash/flatMap'
 import { Moment } from 'moment'
 
