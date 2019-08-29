@@ -1,11 +1,11 @@
 {
-  "name": "sla-calculator",
-  "version": "0.0.0",
-  "description": "",
+  "name": "timespan-calc",
+  "version": "1.0.0",
+  "description": "Library to map and aggregate collections of timespans",
   "keywords": [],
-  "main": "dist/sla-calculator.umd.js",
-  "module": "dist/sla-calculator.es5.js",
-  "typings": "dist/types/sla-calculator.d.ts",
+  "main": "dist/timespan-calc.umd.js",
+  "module": "dist/timespan-calc.es5.js",
+  "typings": "dist/types/timespan-calc.d.ts",
   "files": [
     "dist"
   ],
