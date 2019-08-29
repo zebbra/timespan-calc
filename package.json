@@ -12,7 +12,7 @@
   "author": "Hannes Wüthrich <hannes.wuethrich@zebbra.ch>",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "github.com/zebbra/timespan-calc"
   },
   "license": "MIT",
   "engines": {
