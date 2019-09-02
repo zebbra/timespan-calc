@@ -1,6 +1,6 @@
 {
-  "name": "timespan-calc",
-  "version": "1.0.0",
+  "name": "@zebbra.ch/timespan-calc",
+  "version": "0.9.0",
   "description": "Library to map and aggregate collections of timespans",
   "keywords": [],
   "main": "dist/timespan-calc.umd.js",
@@ -12,11 +12,11 @@
   "author": "Hannes Wüthrich <hannes.wuethrich@zebbra.ch>",
   "repository": {
     "type": "git",
-    "url": "github.com/zebbra/timespan-calc"
+    "url": "git+https://github.com/zebbra/timespan-calc.git"
   },
   "license": "MIT",
   "engines": {
-    "node": ">=6.0.0"
+    "node": ">=8.0.0"
   },
   "scripts": {
     "lint": "tslint  --project tsconfig.json -t codeFrame 'src/**/*.ts' 'test/**/*.ts'",
@@ -30,21 +30,15 @@
     "deploy-docs": "ts-node tools/gh-pages-publish",
     "report-coverage": "cat ./coverage/lcov.info | coveralls",
     "commit": "git-cz",
-    "semantic-release": "semantic-release",
-    "semantic-release-prepare": "ts-node tools/semantic-release-prepare",
     "precommit": "lint-staged",
-    "travis-deploy-once": "travis-deploy-once"
+    "travis-deploy-once": "travis-deploy-once",
+    "prepush": "npm run test:prod && npm run build"
   },
   "lint-staged": {
     "{src,test}/**/*.ts": [
       "prettier --write",
       "git add"
     ]
-  },
-  "config": {
-    "commitizen": {
-      "path": "node_modules/cz-conventional-changelog"
-    }
   },
   "jest": {
     "transform": {
@@ -77,11 +71,6 @@
     "semi": false,
     "singleQuote": true
   },
-  "commitlint": {
-    "extends": [
-      "@commitlint/config-conventional"
-    ]
-  },
   "devDependencies": {
     "@commitlint/cli": "^7.1.2",
     "@commitlint/config-conventional": "^7.1.2",
@@ -110,7 +99,6 @@
     "rollup-plugin-node-resolve": "^3.4.0",
     "rollup-plugin-sourcemaps": "^0.4.2",
     "rollup-plugin-typescript2": "^0.18.0",
-    "semantic-release": "^15.9.16",
     "shelljs": "^0.8.3",
     "travis-deploy-once": "^5.0.9",
     "ts-jest": "^23.10.2",
@@ -124,5 +112,13 @@
   "dependencies": {
     "moment": "^2.24.0",
     "moment-range": "^4.0.2"
+  },
+  "bugs": {
+    "url": "https://github.com/zebbra/timespan-calc/issues"
+  },
+  "homepage": "https://github.com/zebbra/timespan-calc#readme",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
   }
 }
