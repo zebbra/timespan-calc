@@ -1,6 +1,6 @@
 {
   "name": "@zebbra.ch/timespan-calc",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Library to map and aggregate collections of timespans",
   "keywords": [],
   "main": "dist/timespan-calc.umd.js",
