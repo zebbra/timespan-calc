@@ -1,6 +1,6 @@
-import { Schedule, ValueSpan, Operations, Aggregators, Mappers, MapperFn } from '../src'
+import { Schedule, ValueSpan, Operations, Aggregators, Mappers, MapperFn } from '../../src'
 import flatten from 'lodash/flatten'
-import { span, hours } from './helpers'
+import { span, hours } from '../helpers'
 
 describe('Availability Models', () => {
   type CI = Schedule

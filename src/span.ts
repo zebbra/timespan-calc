@@ -38,6 +38,10 @@ export namespace Span {
     }
   }
 
+  export function duration(span: Span): number {
+    return (span.end.valueOf() - span.start.valueOf()) / 1000
+  }
+
   /**
    * Subtracts one {@link Span} from another {@link Span}.
    *
